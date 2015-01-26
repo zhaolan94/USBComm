@@ -1,0 +1,18 @@
+; MFCDLLTest.def : Declares the module parameters for the DLL.
+
+LIBRARY
+
+EXPORTS
+
+		CreateUSBObject
+		DestoryUSBObject
+		InitUSB
+		CloseUSB
+		MonitoringStart
+		MonitoringResume
+		MonitoringSuspend
+		WriteToPort
+		GetRecieveSignal
+		GetRecieveBuffer
+		GetDataByList
+    ; Explicit exports can go here

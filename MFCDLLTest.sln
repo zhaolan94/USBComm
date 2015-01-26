@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MFCDLLTest", "MFCDLLTest\MFCDLLTest.vcxproj", "{792F4945-AA2D-4C14-9A35-6155DF3F0AE0}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleApplicationDLLTest", "ConsoleApplicationDLLTest\ConsoleApplicationDLLTest.vcxproj", "{6738C83A-B836-4E49-A0A1-194A7D180052}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{792F4945-AA2D-4C14-9A35-6155DF3F0AE0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{792F4945-AA2D-4C14-9A35-6155DF3F0AE0}.Debug|Win32.Build.0 = Debug|Win32
+		{792F4945-AA2D-4C14-9A35-6155DF3F0AE0}.Release|Win32.ActiveCfg = Release|Win32
+		{792F4945-AA2D-4C14-9A35-6155DF3F0AE0}.Release|Win32.Build.0 = Release|Win32
+		{6738C83A-B836-4E49-A0A1-194A7D180052}.Debug|Win32.ActiveCfg = Debug|Win32
+		{6738C83A-B836-4E49-A0A1-194A7D180052}.Debug|Win32.Build.0 = Debug|Win32
+		{6738C83A-B836-4E49-A0A1-194A7D180052}.Release|Win32.ActiveCfg = Release|Win32
+		{6738C83A-B836-4E49-A0A1-194A7D180052}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
