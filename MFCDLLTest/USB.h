@@ -1,14 +1,22 @@
 #pragma once
 #include <list>
-#define USB_BUFFER_LEN 512
+#define USB_BUFFER_LEN 1024
 #define RECIEVE_PACKET_SIZE 256
 #define ECHO_PACKET_SIZE 64
 using namespace std;
-typedef struct
+typedef struct _CPR_DATA
 {
 	UINT16 len;
 	char button[5][6];
-}sRecievePacket;
+}sRecievePacket, CPR_DATA;
+typedef struct _CPR_COMMAND_FRAME
+{
+
+}CPR_COMMAND_FRAME;
+typedef struct _CPR_DATA_FRAME
+{
+
+}CPR_DATA_FRAME;
 class CUSB
 {
 public:
@@ -21,7 +29,7 @@ public:
 	BOOL MonitoringSuspend();
 	HANDLE GetRecieveSignal(){ return m_hRecieveSignal; };
 	BOOL GetRecieveBuffer(char *_pBuffer);
-	BOOL GetRecieveBuffer(list<sRecievePacket>*);
+	BOOL GetRecieveBuffer(list<CPR_DATA>*);
 	~CUSB();
 protected:
 	static UINT	USBThread(LPVOID pParam);
@@ -37,11 +45,11 @@ private:
 	//BUFFER
 	char *m_szRecieveBuffer;
 	char *m_szWriteBuffer;
-	std::list<sRecievePacket> m_Packetlist;
+	std::list<CPR_DATA> m_Packetlist;
 	DWORD m_nWriteSize;
 	DWORD m_nRecieveSize;
 	//Packet
-	sRecievePacket *m_RecievePacket;
+	CPR_DATA *m_RecievePacket;
 	//Event handle
 	HANDLE m_hReadEvent;
 	HANDLE m_hWriteEvent;

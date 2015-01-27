@@ -26,9 +26,9 @@ CUSB::CUSB()
 	m_hUSB = NULL;
 	m_szRecieveBuffer = new char[USB_BUFFER_LEN];
 	m_szWriteBuffer = new char[USB_BUFFER_LEN];
-	m_RecievePacket = new sRecievePacket;
+	m_RecievePacket = new CPR_DATA;
 	m_bisTest = false;
-	m_RecievePacket = new sRecievePacket;
+	m_RecievePacket = new CPR_DATA;
 	m_bisReadFinish = true;
 }
 
@@ -241,7 +241,7 @@ UINT CUSB::USBThread(LPVOID pParam)
 #include<time.h>
 UINT CUSB::TestThread(LPVOID pParam)
 {
-	sRecievePacket TestPacket;
+	CPR_DATA TestPacket;
 	CUSB *objCUSB = (CUSB*)pParam;
 	static unsigned char Flag = 0;
 	static char nDeltaX = 4;
@@ -292,8 +292,8 @@ BOOL CUSB::RecieveData(CUSB* _objCUSB)
 	
 	EnterCriticalSection(&_objCUSB->CriticalUSBSection);
 	_objCUSB->m_szRecieveBuffer[_objCUSB->m_nRecieveSize] = '\0';
-	sRecievePacket pPackettemp;
-	memcpy(&pPackettemp, _objCUSB->m_szRecieveBuffer, sizeof(sRecievePacket));
+	CPR_DATA pPackettemp;
+	memcpy(&pPackettemp, _objCUSB->m_szRecieveBuffer, sizeof(CPR_DATA));
 	_objCUSB->m_Packetlist.push_back(pPackettemp);
 	LeaveCriticalSection(&_objCUSB->CriticalUSBSection);
 	TRACE("Recieve %ld Data:%s\n", _objCUSB->m_nRecieveSize, _objCUSB->m_szRecieveBuffer);
@@ -313,7 +313,7 @@ BOOL CUSB::GetRecieveBuffer(char *_pBuffer)
 	else
 	{
 		m_bisReadFinish = false;
-		memcpy(_pBuffer, &m_Packetlist.front(), sizeof(sRecievePacket));
+		memcpy(_pBuffer, &m_Packetlist.front(), sizeof(CPR_DATA));
 		m_Packetlist.pop_front();
 		LeaveCriticalSection(&CriticalUSBSection);
 		return true;
@@ -322,7 +322,7 @@ BOOL CUSB::GetRecieveBuffer(char *_pBuffer)
 	
 }
 
-BOOL CUSB::GetRecieveBuffer(list<sRecievePacket>* _list)
+BOOL CUSB::GetRecieveBuffer(list<CPR_DATA>* _list)
 {
 	EnterCriticalSection(&CriticalUSBSection);
 	if (m_Packetlist.empty())
