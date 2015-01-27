@@ -122,6 +122,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="tiva_guids.h" />
     <ClInclude Include="USB.h" />
+    <ClInclude Include="USBProtocol.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="MFCDLLTest.def" />

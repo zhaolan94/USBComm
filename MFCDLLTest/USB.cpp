@@ -248,10 +248,9 @@ UINT CUSB::TestThread(LPVOID pParam)
 	while(objCUSB->m_bThreadAlive)
 	{
 		EnterCriticalSection(&objCUSB->CriticalUSBSection);
-		TestPacket.len = Flag;
+		TestPacket.nPushLenth = Flag;
 		for (int i = 0; i < 5; i++)
-			for (int j = 0; j < 6;j++)
-				TestPacket.button[i][j] = rand()%2;
+				TestPacket.arryButton[i] = rand()%2;
 		objCUSB->m_Packetlist.push_back(TestPacket);
 		SetEvent(objCUSB->m_hRecieveSignal);
 		LeaveCriticalSection(&objCUSB->CriticalUSBSection);
