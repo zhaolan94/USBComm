@@ -123,6 +123,6 @@ GetRecieveBuffer(char *_pBuffer)
 extern "C" BOOL PASCAL EXPORT
 GetDataByList(void* _pTemp)
 {
-	return pCUSB->GetRecieveBuffer((list<sRecievePacket>*) _pTemp);
+	return pCUSB->GetRecieveBuffer((list<CPR_DATA>*) _pTemp);
 
 }

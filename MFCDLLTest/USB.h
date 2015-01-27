@@ -3,19 +3,28 @@
 #define USB_BUFFER_LEN 1024
 #define RECIEVE_PACKET_SIZE 256
 #define ECHO_PACKET_SIZE 64
+#define CPR_FRAME_HEADER {'C','P','R',0}
+#define CPR_FRAME_VER 1
+#define CPR_FRAME_HEADER_SIZE 4
 using namespace std;
+typedef struct _CPR_FRAME_BEGIN
+{
+	char szHeader[CPR_FRAME_HEADER_SIZE];
+	char nVer;
+}CPR_FRAME_BEGIN;
 typedef struct _CPR_DATA
 {
+	
 	UINT16 len;
 	char button[5][6];
-}sRecievePacket, CPR_DATA;
+}CPR_DATA;
 typedef struct _CPR_COMMAND_FRAME
 {
-
+	CPR_FRAME_BEGIN Frame_Begin;
 }CPR_COMMAND_FRAME;
 typedef struct _CPR_DATA_FRAME
 {
-
+	CPR_FRAME_BEGIN Frame_Begin;
 }CPR_DATA_FRAME;
 class CUSB
 {
