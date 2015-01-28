@@ -7,6 +7,7 @@
 #define CPR_FRAME_HEADER {'C','P','R',0}	//帧头
 #define CPR_FRAME_VER 0x01				//版本号v1.0
 #define CPR_FRAME_HEADER_SIZE 4
+#define CPR_FRAME_VER_SIZE 1
 #define CPR_FRAME_RESERVED_SIZE 4	//数据包保留字节
 #define CPR_DATAS_PER_PACKET 100	//一个包多少组数据
 //帧类型
@@ -17,14 +18,21 @@
 #define CPR_COMMAND_START 0x01	//开始发送数据
 #define CPR_COMMAND_STOP 0x02	//停止发送数据
 #define CPR_COMMAND_RESET 0x03	//单片机复位
+#define CPR_COMMAND_STATUS 0x04	//获取设备状态
 //响应类型
 #define CPR_ECHO_NORMAL 0x01	//单片机自检正常
 #define CPR_ECHO_ABNORMAL 0x02	//自检发现故障
+//ERROR MARCO
+#define ERROR_NORMAL 0x00	//正常
+#define ERROR_UNCONNECTED 0x01	//USB连接异常
+#define ERROR_CHECKFAULT 0x02	//设备自检异常
+#define ERROR_FRAMEFAULT 0x03	//帧错误
+#define ERROR_USB_TIMEOUT 0x04	//超时
 
 typedef struct _CPR_FRAME_BEGIN
 {
 	char szHeader[CPR_FRAME_HEADER_SIZE];
-	char nVer;
+	char nVer = CPR_FRAME_VER;
 	char nFrameType;
 	UINT16 nFrameLenth;
 }CPR_FRAME_BEGIN;
@@ -59,3 +67,5 @@ typedef struct _CPR_ECHO_FRAME
 	char szEchoInfo[51];
 	CPR_FRAME_END Frame_End;
 }CPR_ECHO_FRAME;
+
+

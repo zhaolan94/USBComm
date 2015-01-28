@@ -27,9 +27,10 @@ CUSB::CUSB()
 	m_szRecieveBuffer = new char[USB_BUFFER_LEN];
 	m_szWriteBuffer = new char[USB_BUFFER_LEN];
 	m_RecievePacket = new CPR_DATA;
+	m_szErrorInfo = new char[ERROR_BUFFER_SIZE];
 	m_bisTest = false;
-	m_RecievePacket = new CPR_DATA;
 	m_bisReadFinish = true;
+	m_nErrorCode = ERROR_NORMAL;
 }
 
 
@@ -78,6 +79,10 @@ BOOL CUSB::InitUSB()
 		ResetEvent(m_hRecieveSignal);
 	else
 		m_hRecieveSignal = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (m_hAbnormalSignal != NULL)
+		ResetEvent(m_hAbnormalSignal);
+	else
+		m_hAbnormalSignal = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 	m_hEventArray[0] = m_hShutDown;	// highest priority
 	m_hEventArray[1] = m_hReadEvent;
@@ -89,6 +94,7 @@ BOOL CUSB::InitUSB()
 	{
 		m_bisTest = true;
 		TRACE("USB iNIT ERROR!");
+		m_nErrorCode = ERROR_UNCONNECTED;
 		return false;
 		
 	}
@@ -126,6 +132,16 @@ BOOL CUSB::CloseUSB()
 	{
 		CloseHandle(m_hShutDown);
 		m_hShutDown = NULL;
+	}
+	if (m_hRecieveSignal != NULL)
+	{
+		CloseHandle(m_hRecieveSignal);
+		m_hRecieveSignal = NULL;
+	}
+	if (m_hAbnormalSignal != NULL)
+	{
+		CloseHandle(m_hAbnormalSignal);
+		m_hAbnormalSignal = NULL;
 	}
 	if (m_hUSB != NULL)
 	{
@@ -179,15 +195,22 @@ BOOL CUSB::MonitoringSuspend()
 	}
 	return TRUE;
 }
+
 UINT CUSB::USBThread(LPVOID pParam)
 {
 	CUSB *objCUSB = (CUSB*)pParam;
 	DWORD Event;
 	DWORD bResult = ERROR_SUCCESS;
 	OVERLAPPED sOverlapped;
+	BOOL bIsCheckDevice = false;
 	for (;;)
 	{
-	
+		if (!bIsCheckDevice)
+		{
+			//未检查设备状态
+			objCUSB->SendCommandFrame(CPR_COMMAND_STATUS);
+			bIsCheckDevice = true;
+		}
 		if (bResult != ERROR_IO_PENDING)
 		{
 			sOverlapped.hEvent = objCUSB->m_hEventArray[1];
@@ -195,6 +218,13 @@ UINT CUSB::USBThread(LPVOID pParam)
 			sOverlapped.OffsetHigh = 0;
 			bResult = MyReadUSBPacket(objCUSB->m_hUSB, (unsigned char*)objCUSB->m_szRecieveBuffer, USB_BUFFER_LEN, &objCUSB->m_nRecieveSize,
 				INFINITE, objCUSB->m_hEventArray[1], &sOverlapped);
+		}
+		if (bResult != ERROR_SUCCESS && bResult != ERROR_IO_PENDING)
+		{
+			//USB连接意外丢失
+			objCUSB->m_nErrorCode = ERROR_UNCONNECTED;
+			SetEvent(objCUSB->m_hShutDown);
+			SetEvent(objCUSB->m_hAbnormalSignal);
 		}
 		
 		Event = WaitForMultipleObjects(3, objCUSB->m_hEventArray, FALSE, INFINITE);
@@ -205,6 +235,7 @@ UINT CUSB::USBThread(LPVOID pParam)
 				//ShutDown
 				objCUSB->m_bThreadAlive = false;
 				TRACE("Thread Terminated!\n");
+				ResetEvent(objCUSB->m_hEventArray[0]);
 				AfxEndThread(100);
 				break;
 			}
@@ -215,18 +246,19 @@ UINT CUSB::USBThread(LPVOID pParam)
 				{
 					GetOverlappedResult(objCUSB->m_hUSB, &sOverlapped, &objCUSB->m_nRecieveSize, FALSE);
 				}
+				ResetEvent(objCUSB->m_hEventArray[1]);
 				TRACE("Recieve Data!\n");
 				if (objCUSB->m_bisReadFinish)
 				{
 					RecieveData(objCUSB);
-					SetEvent(objCUSB->m_hRecieveSignal);
+					
 				}
 				bResult = ERROR_SUCCESS;
 				break;
 			}
 		case 2:
 		{
-			//Read
+			//Write
 			ResetEvent(objCUSB->m_hWriteEvent);
 			TransmitData(objCUSB);
 			break;
@@ -243,6 +275,7 @@ UINT CUSB::TestThread(LPVOID pParam)
 {
 	CPR_DATA TestPacket;
 	CUSB *objCUSB = (CUSB*)pParam;
+	srand(unsigned int(time(0)));
 	static unsigned char Flag = 0;
 	static char nDeltaX = 4;
 	while(objCUSB->m_bThreadAlive)
@@ -286,19 +319,82 @@ void CUSB::WriteToUSB(char *_string)
 	// set event for write
 	SetEvent(m_hWriteEvent);
 }
+void CUSB::WriteToUSB(char *_string,UINT16 _nSize)
+{
+	memset(m_szWriteBuffer, 0, sizeof(m_szWriteBuffer));
+	memcpy(m_szWriteBuffer, _string, _nSize);
+	m_nWriteSize = _nSize;
+
+	// set event for write
+	SetEvent(m_hWriteEvent);
+}
 BOOL CUSB::RecieveData(CUSB* _objCUSB)
 {
-	
-	EnterCriticalSection(&_objCUSB->CriticalUSBSection);
 	_objCUSB->m_szRecieveBuffer[_objCUSB->m_nRecieveSize] = '\0';
-	CPR_DATA pPackettemp;
-	memcpy(&pPackettemp, _objCUSB->m_szRecieveBuffer, sizeof(CPR_DATA));
-	_objCUSB->m_Packetlist.push_back(pPackettemp);
-	LeaveCriticalSection(&_objCUSB->CriticalUSBSection);
-	TRACE("Recieve %ld Data:%s\n", _objCUSB->m_nRecieveSize, _objCUSB->m_szRecieveBuffer);
-	Sleep(1000/500);
-	return true;
+	char szHeader[] = CPR_FRAME_HEADER;
+	char *pBuffer = _objCUSB->m_szRecieveBuffer;
+	char *pTemp = new char[CPR_FRAME_HEADER_SIZE];
+	memcpy(pTemp, pBuffer, sizeof(pTemp));
+	if ( 0 == strcmp(pTemp, szHeader) )
+	{
+		//Get Frame Type
+		pTemp = pBuffer + CPR_FRAME_HEADER_SIZE + CPR_FRAME_VER_SIZE;
+		if (CPR_FRAME_TYPE_ECHO == *pTemp)
+		{
+			//GET ECHO FRAME
+			pTemp = pBuffer + sizeof(CPR_FRAME_BEGIN);
+			if (CPR_ECHO_NORMAL == *pTemp)
+			{
+				//Device feels good!
+				_objCUSB->SendCommandFrame(CPR_COMMAND_START);
+				return true;
+			}
+			else if (CPR_ECHO_ABNORMAL == *pTemp)
+			{
+				//Device feels BAD!
+				_objCUSB->m_nErrorCode = ERROR_CHECKFAULT;
+				memcpy(_objCUSB->m_szErrorInfo, pTemp + 1, 51);
+				SetEvent(_objCUSB->m_hAbnormalSignal);
+				return true;
+			}
+		}
+		else if (CPR_FRAME_TYPE_DATA == *pTemp)
+		{
+			//GET DATA FRAME
+			pTemp = pBuffer + sizeof(CPR_FRAME_BEGIN); //Go to Data Section's Base
+
+			EnterCriticalSection(&_objCUSB->CriticalUSBSection);
+			for (int i = 0; i < CPR_DATAS_PER_PACKET; i++)
+			{
+				CPR_DATA pDataTemp;
+				memcpy(&pDataTemp, pTemp, sizeof(CPR_DATA));
+				_objCUSB->m_Packetlist.push_back(pDataTemp);
+				pTemp = pTemp + sizeof(CPR_DATA);
+
+			}
+			LeaveCriticalSection(&_objCUSB->CriticalUSBSection);
+			TRACE("Recieve %ld Data:%s\n", _objCUSB->m_nRecieveSize, _objCUSB->m_szRecieveBuffer);
+			SetEvent(_objCUSB->m_hRecieveSignal);
+			
+			return true;
+		}
+		else
+		{
+			//Frame Fault
+			_objCUSB->m_nErrorCode = ERROR_FRAMEFAULT;
+			SetEvent(_objCUSB->m_hAbnormalSignal);
+		}
+
+	}
+	else
+	{
+		//Frame Fault
+		_objCUSB->m_nErrorCode = ERROR_FRAMEFAULT;
+		SetEvent(_objCUSB->m_hAbnormalSignal);
+	}
+	return false;
 }
+
 BOOL CUSB::GetRecieveBuffer(char *_pBuffer)
 {
 	EnterCriticalSection(&CriticalUSBSection);
@@ -340,7 +436,35 @@ BOOL CUSB::GetRecieveBuffer(list<CPR_DATA>* _list)
 
 }
 
+void CUSB::StopDataTransfer()
+{
+	;
+}
+void CUSB::SendCommandFrame(const char _CommandType, const char *CommandPara)
+{
+	const char conHeader[] = CPR_FRAME_HEADER;
+	CPR_COMMAND_FRAME *pCommandFrame = new CPR_COMMAND_FRAME;
+	memset(pCommandFrame, 0, sizeof(CPR_COMMAND_FRAME));
+	memcpy(&pCommandFrame->Frame_Begin.szHeader, conHeader, CPR_FRAME_HEADER_SIZE);
+	pCommandFrame->Frame_Begin.nFrameType = CPR_FRAME_TYPE_COMMAND;
+	pCommandFrame->Frame_Begin.nFrameLenth = sizeof(CPR_COMMAND_FRAME);
+	pCommandFrame->nCommandType = _CommandType;
+	if (CommandPara != NULL)
+	{
+		strcpy_s(pCommandFrame->szCommandParamter, CommandPara);
+	}
+	WriteToUSB((char*)pCommandFrame, (UINT16)sizeof(CPR_COMMAND_FRAME));
 
+}
+UINT16 CUSB::GetErrorCode()
+{
+	return m_nErrorCode;
+}
+BOOL CUSB::GetErrorLog(char*_pTemp)
+{
+	memcpy(_pTemp, m_szErrorInfo, ECHO_PACKET_SIZE);
+	return true;
+}
 #pragma comment(lib, "winusb.lib ") 
 DWORD MyReadUSBPacket(LMUSB_HANDLE hUSB, unsigned char *pcBuffer, unsigned long ulSize,
 						unsigned long *pulRead, unsigned long ulTimeoutmS, HANDLE _Signal, OVERLAPPED *_sOverlapped = NULL)

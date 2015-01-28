@@ -7,11 +7,13 @@
 #include <list>
 #include <iterator>
 using namespace std;
-typedef struct
+typedef struct _CPR_DATA
 {
-	UINT16 len;
-	char button[5][6];
-}sRecievePacket;
+
+	unsigned char nPushLenth; //按压深度
+	unsigned char nBreathLenth; //呼吸深度
+	unsigned char arryButton[5]; //按压区域
+}CPR_DATA;
 int _tmain(int argc, _TCHAR* argv[])
 {
 	/*
@@ -38,8 +40,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	*/
 
 	HANDLE Signal;
-	list<sRecievePacket> listBuffer;
-	sRecievePacket Buffer;
+	list<CPR_DATA> listBuffer;
+	CPR_DATA Buffer;
 	CreateUSBObject();
 	InitUSB();
 	Signal = GetRecieveSignal();
@@ -54,18 +56,16 @@ int _tmain(int argc, _TCHAR* argv[])
 		{
 			do
 			{
-				memcpy(&Buffer, &listBuffer.front(), sizeof(sRecievePacket));
+				memcpy(&Buffer, &listBuffer.front(), sizeof(CPR_DATA));
 				listBuffer.pop_front();
-				printf("Len:%d\n", Buffer.len);
+				printf("PushLenth:%d\n", Buffer.nPushLenth);
+				printf("PushLenth:%d\n", Buffer.nBreathLenth);
 				for (int i = 0; i < 5; i++)
 				{
-					for (int j = 0; j < 6; j++)
-					{
-						printf("[%d]", Buffer.button[i][j]);
-					}
-					printf("\n");
+					printf("[%d]", Buffer.arryButton[i]);
 				}
-				printf("HIT:%d", hit);
+				printf("\n");
+				printf("HIT:%d\n", hit);
 			} while (!listBuffer.empty());
 
 		//	system("cls");
