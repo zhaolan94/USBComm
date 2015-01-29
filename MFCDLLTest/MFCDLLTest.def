@@ -13,6 +13,9 @@ EXPORTS
 		MonitoringSuspend
 		WriteToPort
 		GetRecieveSignal
+		GetAbnormalSignal
 		GetRecieveBuffer
 		GetDataByList
+		GetErrorCode
+		GetErrorLog
     ; Explicit exports can go here

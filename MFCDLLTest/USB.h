@@ -47,7 +47,8 @@ private:
 	HANDLE m_hReadEvent;
 	HANDLE m_hWriteEvent;
 	HANDLE m_hShutDown;
-	HANDLE m_hEventArray[3];
+	HANDLE m_hNormalClose;
+	HANDLE m_hEventArray[4];
 	//Signal handle
 	HANDLE m_hAbnormalSignal;
 	HANDLE m_hRecieveSignal;

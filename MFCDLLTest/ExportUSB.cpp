@@ -114,6 +114,12 @@ GetRecieveSignal()
 	return pCUSB->GetRecieveSignal();
 }
 
+extern "C" HANDLE PASCAL EXPORT
+GetAbnormalSignal()
+{
+	return pCUSB->GetAbnormalSignal();
+}
+
 extern "C" BOOL PASCAL EXPORT
 GetRecieveBuffer(char *_pBuffer)
 {
@@ -124,5 +130,19 @@ extern "C" BOOL PASCAL EXPORT
 GetDataByList(void* _pTemp)
 {
 	return pCUSB->GetRecieveBuffer((list<CPR_DATA>*) _pTemp);
+
+}
+
+extern "C" UINT16 PASCAL EXPORT
+GetErrorCode()
+{
+	return pCUSB->GetErrorCode();
+
+}
+
+extern "C" BOOL PASCAL EXPORT
+GetErrorLog(char* _pTemp)
+{
+	return pCUSB ->GetErrorLog(_pTemp);
 
 }

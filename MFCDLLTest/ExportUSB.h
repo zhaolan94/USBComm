@@ -40,10 +40,15 @@ extern "C" {
 		BOOL __stdcall MonitoringResume();
 		BOOL __stdcall MonitoringSuspend();
 		void __stdcall WriteToPort(char*);
-		HANDLE __stdcall GetRecieveSignal();
-		BOOL __stdcall GetRecieveBuffer(char*);
-		BOOL __stdcall GetDataByList(void*);
 
+		HANDLE __stdcall GetRecieveSignal();	//接收数据信号
+		HANDLE __stdcall GetAbnormalSignal();	//异常信号
+
+		BOOL __stdcall GetRecieveBuffer(char*);	
+		BOOL __stdcall GetDataByList(void*);
+		
+		UINT16 __stdcall GetErrorCode();
+		BOOL __stdcall GetErrorLog(char*);
 
 
 

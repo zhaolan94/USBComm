@@ -21,6 +21,9 @@ CUSB::CUSB()
 	m_hReadEvent = NULL;
 	m_hWriteEvent = NULL;
 	m_hShutDown = NULL;
+	m_hNormalClose = NULL;
+	m_hRecieveSignal = NULL;
+	m_hAbnormalSignal = NULL;
 	m_bDriverInstalled = false;
 	m_bThreadAlive = false;
 	m_hUSB = NULL;
@@ -41,6 +44,11 @@ CUSB::~CUSB()
 		TerminateDevice(m_hUSB);
 		m_hUSB = NULL;
 	}
+	delete m_szRecieveBuffer;
+	delete m_szWriteBuffer;
+	delete m_RecievePacket;
+	delete m_szErrorInfo;
+
 }
 BOOL CUSB::InitUSB()
 {
@@ -53,7 +61,7 @@ BOOL CUSB::InitUSB()
 		else
 		{
 			do{
-				SetEvent(m_hShutDown);
+				SetEvent(m_hNormalClose);
 			} while (m_bThreadAlive);
 			TerminateDevice(m_hUSB);
 		}
@@ -74,6 +82,10 @@ BOOL CUSB::InitUSB()
 		ResetEvent(m_hShutDown);
 	else
 		m_hShutDown = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (m_hNormalClose != NULL)
+		ResetEvent(m_hNormalClose);
+	else
+		m_hNormalClose = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 	if (m_hRecieveSignal != NULL)
 		ResetEvent(m_hRecieveSignal);
@@ -87,6 +99,7 @@ BOOL CUSB::InitUSB()
 	m_hEventArray[0] = m_hShutDown;	// highest priority
 	m_hEventArray[1] = m_hReadEvent;
 	m_hEventArray[2] = m_hWriteEvent;
+	m_hEventArray[3] = m_hNormalClose;
 	InitializeCriticalSection(&CriticalReadSection);
 	InitializeCriticalSection(&CriticalUSBSection);
 	m_hUSB = InitializeDevice(BULK_VID, BULK_PID,(LPGUID)&(GUID_DEVINTERFACE_TIVA_BULK),&m_bDriverInstalled);
@@ -98,8 +111,13 @@ BOOL CUSB::InitUSB()
 		return false;
 		
 	}
-	TRACE("USB INited!");
-	return true;
+	else
+	{
+		m_bisTest = false;
+		TRACE("USB INited!");
+		return true;
+	}
+
 }
 BOOL CUSB::CloseUSB()
 {
@@ -109,10 +127,14 @@ BOOL CUSB::CloseUSB()
 	}
 	else
 	{
-		do
+		if (m_bThreadAlive)
 		{
-			SetEvent(m_hShutDown);
-		} while (m_bThreadAlive);
+			do
+			{
+				SetEvent(m_hNormalClose);
+			} while (m_bThreadAlive);
+		}
+
 	}
 
 
@@ -132,6 +154,11 @@ BOOL CUSB::CloseUSB()
 	{
 		CloseHandle(m_hShutDown);
 		m_hShutDown = NULL;
+	}
+	if (m_hNormalClose != NULL)
+	{
+		CloseHandle(m_hNormalClose);
+		m_hNormalClose = NULL;
 	}
 	if (m_hRecieveSignal != NULL)
 	{
@@ -227,7 +254,7 @@ UINT CUSB::USBThread(LPVOID pParam)
 			SetEvent(objCUSB->m_hAbnormalSignal);
 		}
 		
-		Event = WaitForMultipleObjects(3, objCUSB->m_hEventArray, FALSE, INFINITE);
+		Event = WaitForMultipleObjects(4, objCUSB->m_hEventArray, FALSE, INFINITE);
 		switch (Event)
 		{
 		case 0:
@@ -248,19 +275,33 @@ UINT CUSB::USBThread(LPVOID pParam)
 				}
 				ResetEvent(objCUSB->m_hEventArray[1]);
 				TRACE("Recieve Data!\n");
-				if (objCUSB->m_bisReadFinish)
-				{
-					RecieveData(objCUSB);
-					
-				}
+				RecieveData(objCUSB);
 				bResult = ERROR_SUCCESS;
 				break;
 			}
 		case 2:
 		{
 			//Write
-			ResetEvent(objCUSB->m_hWriteEvent);
+			ResetEvent(objCUSB->m_hEventArray[2]);
 			TransmitData(objCUSB);
+			break;
+		}
+		case 3:
+		{
+			//Normal Close
+			ResetEvent(objCUSB->m_hEventArray[3]);
+			const char conHeader[] = CPR_FRAME_HEADER;
+			CPR_COMMAND_FRAME *pCommandFrame = new CPR_COMMAND_FRAME;
+			memset(pCommandFrame, 0, sizeof(CPR_COMMAND_FRAME));
+			memcpy(&pCommandFrame->Frame_Begin.szHeader, conHeader, CPR_FRAME_HEADER_SIZE);
+			pCommandFrame->Frame_Begin.nFrameType = CPR_FRAME_TYPE_COMMAND;
+			pCommandFrame->Frame_Begin.nFrameLenth = sizeof(CPR_COMMAND_FRAME);
+			pCommandFrame->nCommandType = CPR_COMMAND_STOP;
+			memcpy(objCUSB->m_szWriteBuffer, pCommandFrame, sizeof(CPR_COMMAND_FRAME));
+			objCUSB->m_nWriteSize = sizeof(CPR_COMMAND_FRAME);
+			TransmitData(objCUSB);
+			SetEvent(objCUSB->m_hShutDown);
+			delete pCommandFrame;
 			break;
 		}
 
@@ -337,6 +378,7 @@ BOOL CUSB::RecieveData(CUSB* _objCUSB)
 	memcpy(pTemp, pBuffer, sizeof(pTemp));
 	if ( 0 == strcmp(pTemp, szHeader) )
 	{
+		delete pTemp;
 		//Get Frame Type
 		pTemp = pBuffer + CPR_FRAME_HEADER_SIZE + CPR_FRAME_VER_SIZE;
 		if (CPR_FRAME_TYPE_ECHO == *pTemp)
@@ -356,6 +398,13 @@ BOOL CUSB::RecieveData(CUSB* _objCUSB)
 				memcpy(_objCUSB->m_szErrorInfo, pTemp + 1, 51);
 				SetEvent(_objCUSB->m_hAbnormalSignal);
 				return true;
+			}
+			else
+			{
+				//Frame Fault
+				_objCUSB->m_nErrorCode = ERROR_FRAMEFAULT;
+				SetEvent(_objCUSB->m_hAbnormalSignal);
+				return false;
 			}
 		}
 		else if (CPR_FRAME_TYPE_DATA == *pTemp)
@@ -380,19 +429,24 @@ BOOL CUSB::RecieveData(CUSB* _objCUSB)
 		}
 		else
 		{
+			
 			//Frame Fault
 			_objCUSB->m_nErrorCode = ERROR_FRAMEFAULT;
 			SetEvent(_objCUSB->m_hAbnormalSignal);
+			return false;
 		}
 
 	}
 	else
 	{
+		
+		delete pTemp;
 		//Frame Fault
 		_objCUSB->m_nErrorCode = ERROR_FRAMEFAULT;
 		SetEvent(_objCUSB->m_hAbnormalSignal);
+		return false;
 	}
-	return false;
+
 }
 
 BOOL CUSB::GetRecieveBuffer(char *_pBuffer)
@@ -454,6 +508,7 @@ void CUSB::SendCommandFrame(const char _CommandType, const char *CommandPara)
 		strcpy_s(pCommandFrame->szCommandParamter, CommandPara);
 	}
 	WriteToUSB((char*)pCommandFrame, (UINT16)sizeof(CPR_COMMAND_FRAME));
+	delete pCommandFrame;
 
 }
 UINT16 CUSB::GetErrorCode()
